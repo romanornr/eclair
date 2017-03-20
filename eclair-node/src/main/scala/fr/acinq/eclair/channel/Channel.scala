@@ -219,6 +219,7 @@ class Channel(nodeParams: NodeParams, remoteNodeId: PublicKey, blockchain: Actor
       // let's create the first commitment tx that spends the yet uncommitted funding tx
       val (localSpec, localCommitTx, remoteSpec, remoteCommitTx) = Funding.makeFirstCommitTxs(localParams, remoteParams, fundingSatoshis, pushMsat, initialFeeratePerKw, fundingTx.hash, fundingTxOutputIndex, remoteFirstPerCommitmentPoint)
 
+      log.info(s"their commit tx: ${Transaction.write(remoteCommitTx.tx)}")
       val localSigOfRemoteTx = Transactions.sign(remoteCommitTx, localParams.fundingPrivKey)
       // signature of their initial commitment tx that pays remote pushMsat
       val fundingCreated = FundingCreated(

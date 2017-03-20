@@ -82,7 +82,7 @@ object NodeParams {
       color = (color.data(0), color.data(1), color.data(2)),
       address = new InetSocketAddress(config.getString("server.public-ip"), config.getInt("server.port")),
       globalFeatures = BinaryData(""),
-      localFeatures = BinaryData("05"), // channels_public and initial_routing_sync
+      localFeatures = BinaryData(""), // BinaryData("05"), // channels_public and initial_routing_sync
       dustLimitSatoshis = 542,
       maxHtlcValueInFlightMsat = Long.MaxValue,
       maxAcceptedHtlcs = 100,

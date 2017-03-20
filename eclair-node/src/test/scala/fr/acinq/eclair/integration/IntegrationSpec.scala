@@ -21,6 +21,7 @@ import org.scalatest.junit.JUnitRunner
 import org.scalatest.{BeforeAndAfterAll, FunSuiteLike}
 
 import scala.compat.Platform
+import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
 import scala.sys.process._
 
@@ -133,6 +134,20 @@ class IntegrationSpec extends TestKit(ActorSystem("test")) with FunSuiteLike wit
     node1.system.eventStream.unsubscribe(eventListener.ref)
   }
 
+  def reconnect(node1: Setup, node2: Setup) = {
+    val eventListener = TestProbe()
+    node1.system.eventStream.subscribe(eventListener.ref, classOf[ChannelStateChanged])
+    val sender = TestProbe()
+    sender.send(node1.switchboard, NewConnection(
+      remoteNodeId = node2.nodeParams.privateKey.publicKey,
+      address = node2.nodeParams.address,
+      newChannel_opt = None))
+    sender.expectMsg("connected")
+    // waiting for channel to publish funding tx
+    awaitCond(eventListener.expectMsgType[ChannelStateChanged](5 seconds).previousState == OFFLINE)
+    node1.system.eventStream.unsubscribe(eventListener.ref)
+  }
+
   test("connect A->B->C->D") {
     connect(setupA, setupB, 1000000, 0)
     connect(setupB, setupC, 1000000, 0)
@@ -206,6 +221,54 @@ class IntegrationSpec extends TestKit(ActorSystem("test")) with FunSuiteLike wit
     val paymentReq = CreatePayment(600000000L, paymentHash, setupD.nodeParams.privateKey.publicKey)
     sender.send(setupA.paymentInitiator, paymentReq)
     sender.expectMsgType[PaymentFailed].error === Some(PaymentError(setupC.nodeParams.privateKey.publicKey, FailureMessage.permanent_node_failure))
+  }
+
+  test("disconnect and reconnect A") {
+    Await.result(setupA.system.terminate(), 20 seconds)
+
+    val setupA1 = new Setup(PATH_ECLAIR_DATADIR_A.toString)
+    setupA1.boostrap
+    reconnect(setupA1, setupB)
+
+    val sender = TestProbe()
+    awaitCond({
+      sender.send(setupA1.router, 'channels)
+      sender.expectMsgType[Iterable[ChannelAnnouncement]].toSeq.length == 3
+    }, max = 20 seconds, interval = 1 second)
+
+    // first we retrieve a payment hash from D
+    sender.send(setupD.paymentHandler, 'genh)
+    val paymentHash = sender.expectMsgType[BinaryData]
+    // then we make the actual payment
+    sender.send(setupA1.paymentInitiator, CreatePayment(4200000, paymentHash, setupD.nodeParams.privateKey.publicKey))
+    sender.expectMsgType[PaymentSucceeded]
+  }
+
+  test("disconnect and reconnect all nodes") {
+    import system.dispatcher
+
+    val futures = Seq(setupA, setupB, setupC, setupD).map(_.system.terminate())
+    Await.result(Future.sequence(futures), 20 seconds)
+
+    val setupA1 = new Setup(PATH_ECLAIR_DATADIR_A.toString)
+    val setupB1 = new Setup(PATH_ECLAIR_DATADIR_B.toString)
+    val setupC1 = new Setup(PATH_ECLAIR_DATADIR_C.toString)
+    val setupD1 = new Setup(PATH_ECLAIR_DATADIR_D.toString)
+    setupA1.boostrap
+    setupB1.boostrap
+    setupC1.boostrap
+    setupD1.boostrap
+    reconnect(setupA1, setupB1)
+    reconnect(setupB1, setupC1)
+    reconnect(setupC1, setupD1)
+
+    val sender = TestProbe()
+    // first we retrieve a payment hash from D
+    sender.send(setupA1.paymentHandler, 'genh)
+    val paymentHash = sender.expectMsgType[BinaryData]
+    // then we make the actual payment
+    sender.send(setupD1.paymentInitiator, CreatePayment(1000000, paymentHash, setupA1.nodeParams.privateKey.publicKey))
+    sender.expectMsgType[PaymentSucceeded]
   }
 
 }

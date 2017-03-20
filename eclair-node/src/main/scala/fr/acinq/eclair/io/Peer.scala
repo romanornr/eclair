@@ -206,12 +206,13 @@ object Peer {
   def makeChannelParams(nodeParams: NodeParams, defaultFinalScriptPubKey: BinaryData, isFunder: Boolean, fundingSatoshis: Long): LocalParams = {
     // all secrets are generated from the main seed
     val keyIndex = Random.nextInt(1000).toLong
+    val channelReserveSatoshis = (nodeParams.reserveToFundingRatio * fundingSatoshis).toLong
     LocalParams(
       nodeId = nodeParams.privateKey.publicKey,
       dustLimitSatoshis = nodeParams.dustLimitSatoshis,
       maxHtlcValueInFlightMsat = nodeParams.maxHtlcValueInFlightMsat,
-      channelReserveSatoshis = (nodeParams.reserveToFundingRatio * fundingSatoshis).toLong,
-      htlcMinimumMsat = nodeParams.htlcMinimumMsat,
+      channelReserveSatoshis = channelReserveSatoshis,
+      htlcMinimumMsat = Math.min(nodeParams.htlcMinimumMsat, (fundingSatoshis - channelReserveSatoshis)), // * 1000 / 1000
       toSelfDelay = nodeParams.delayBlocks,
       maxAcceptedHtlcs = nodeParams.maxAcceptedHtlcs,
       fundingPrivKey = generateKey(nodeParams, keyIndex :: 0L :: Nil),

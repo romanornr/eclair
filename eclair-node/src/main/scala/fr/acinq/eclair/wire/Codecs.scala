@@ -22,6 +22,12 @@ object Codecs {
   // (for something smarter see https://github.com/yzernik/bitcoin-scodec/blob/master/src/main/scala/io/github/yzernik/bitcoinscodec/structures/UInt64.scala)
   val uint64: Codec[Long] = int64.narrow(l => if (l >= 0) Attempt.Successful(l) else Attempt.failure(Err(s"overflow for value $l")), l => l)
 
+  val uint64_ex: Codec[Long] = int64.narrow(_ match {
+    case l if l >= 0 => Attempt.Successful(l)
+    case -1L => Attempt.Successful(Long.MaxValue)
+    case l => Attempt.failure(Err(s"overflow for value $l"))
+  }, l => l)
+
   def binarydata(size: Int): Codec[BinaryData] = bytes(size).xmap(d => BinaryData(d.toArray), d => ByteVector(d.data))
 
   def varsizebinarydata: Codec[BinaryData] = variableSizeBytes(uint16, bytes.xmap(d => BinaryData(d.toArray), d => ByteVector(d.data)))
@@ -116,7 +122,7 @@ object Codecs {
   val acceptChannelCodec: Codec[AcceptChannel] = (
     ("temporaryChannelId" | binarydata(32)) ::
       ("dustLimitSatoshis" | uint64) ::
-      ("maxHtlcValueInFlightMsat" | uint64) ::
+      ("maxHtlcValueInFlightMsat" | uint64_ex) ::
       ("channelReserveSatoshis" | uint64) ::
       ("minimumDepth" | uint32) ::
       ("htlcMinimumMsat" | uint32) ::
