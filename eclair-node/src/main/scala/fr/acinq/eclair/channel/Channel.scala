@@ -275,43 +275,46 @@ class Channel(val nodeParams: NodeParams, remoteNodeId: PublicKey, blockchain: A
 
   when(WAIT_FOR_FUNDING_CREATED)(handleExceptions {
     case Event(FundingCreated(_, fundingTxHash, fundingTxOutputIndex, remoteSig), DATA_WAIT_FOR_FUNDING_CREATED(temporaryChannelId, localParams, remoteParams, fundingSatoshis, pushMsat, initialFeeratePerKw, remoteFirstPerCommitmentPoint, _)) =>
+      val channelId = toLongId(fundingTxHash, fundingTxOutputIndex)
       // they fund the channel with their funding tx, so the money is theirs (but we are paid pushMsat)
-      val (localSpec, localCommitTx, remoteSpec, remoteCommitTx) = Funding.makeFirstCommitTxs(localParams, remoteParams, fundingSatoshis: Long, pushMsat, initialFeeratePerKw, fundingTxHash, fundingTxOutputIndex, remoteFirstPerCommitmentPoint, nodeParams.maxFeerateMismatch)
+      Try(Funding.makeFirstCommitTxs(localParams, remoteParams, fundingSatoshis: Long, pushMsat, initialFeeratePerKw, fundingTxHash, fundingTxOutputIndex, remoteFirstPerCommitmentPoint, nodeParams.maxFeerateMismatch)) flatMap {
+        case (localSpec, localCommitTx, remoteSpec, remoteCommitTx) =>
+          // check remote signature validity
+          val localSigOfLocalTx = Transactions.sign(localCommitTx, localParams.fundingPrivKey)
+          val signedLocalCommitTx = Transactions.addSigs(localCommitTx, localParams.fundingPrivKey.publicKey, remoteParams.fundingPubKey, localSigOfLocalTx, remoteSig)
+          Transactions.checkSpendable(signedLocalCommitTx).map {
+            case _ => (localSpec, localCommitTx, remoteSpec, remoteCommitTx, signedLocalCommitTx) // remote sig is valid
+          }
+      } match {
+            case Failure(cause) =>
+              log.error(cause, "")
+              forwarder ! Error(channelId, cause.getMessage.getBytes)
+              // we haven't anything at stake yet, we can just stop
+              goto(CLOSED)
+            case Success((localSpec, localCommitTx, remoteSpec, remoteCommitTx, signedLocalCommitTx)) =>
+              val localSigOfRemoteTx = Transactions.sign(remoteCommitTx, localParams.fundingPrivKey)
+              val fundingSigned = FundingSigned(
+                channelId = channelId,
+                signature = localSigOfRemoteTx
+              )
 
-      // check remote signature validity
-      val localSigOfLocalTx = Transactions.sign(localCommitTx, localParams.fundingPrivKey)
-      val signedLocalCommitTx = Transactions.addSigs(localCommitTx, localParams.fundingPrivKey.publicKey, remoteParams.fundingPubKey, localSigOfLocalTx, remoteSig)
-      Transactions.checkSpendable(signedLocalCommitTx) match {
-        case Failure(cause) =>
-          log.error(cause, "their FundingCreated message contains an invalid signature")
-          forwarder ! Error(temporaryChannelId, cause.getMessage.getBytes)
-          // we haven't anything at stake yet, we can just stop
-          goto(CLOSED)
-        case Success(_) =>
-          val localSigOfRemoteTx = Transactions.sign(remoteCommitTx, localParams.fundingPrivKey)
-          val channelId = toLongId(fundingTxHash, fundingTxOutputIndex)
-          val fundingSigned = FundingSigned(
-            channelId = channelId,
-            signature = localSigOfRemoteTx
-          )
+              // watch the funding tx transaction
+              val commitInput = localCommitTx.input
+              blockchain ! WatchSpent(self, commitInput.outPoint.txid, commitInput.outPoint.index.toInt, BITCOIN_FUNDING_SPENT) // TODO: should we wait for an acknowledgment from the watcher?
+              blockchain ! WatchConfirmed(self, commitInput.outPoint.txid, nodeParams.minDepthBlocks, BITCOIN_FUNDING_DEPTHOK)
 
-          // watch the funding tx transaction
-          val commitInput = localCommitTx.input
-          blockchain ! WatchSpent(self, commitInput.outPoint.txid, commitInput.outPoint.index.toInt, BITCOIN_FUNDING_SPENT) // TODO: should we wait for an acknowledgment from the watcher?
-          blockchain ! WatchConfirmed(self, commitInput.outPoint.txid, nodeParams.minDepthBlocks, BITCOIN_FUNDING_DEPTHOK)
-
-          val commitments = Commitments(localParams, remoteParams,
-            LocalCommit(0, localSpec, PublishableTxs(signedLocalCommitTx, Nil), null), RemoteCommit(0, remoteSpec, remoteCommitTx.tx.txid, remoteFirstPerCommitmentPoint),
-            LocalChanges(Nil, Nil, Nil), RemoteChanges(Nil, Nil, Nil),
-            localNextHtlcId = 0L, remoteNextHtlcId = 0L,
-            remoteNextCommitInfo = Right(null), // TODO: we will receive their next per-commitment point in the next message, so we temporarily put an empty byte array,
-            unackedMessages = Nil,
-            commitInput, ShaChain.init, channelId = channelId)
-          context.parent ! ChannelIdAssigned(self, temporaryChannelId, channelId) // we notify the peer asap so it knows how to route messages
-          context.system.eventStream.publish(ChannelIdAssigned(self, temporaryChannelId, channelId))
-          context.system.eventStream.publish(ChannelSignatureReceived(self, commitments))
-          goto(WAIT_FOR_FUNDING_CONFIRMED) using DATA_WAIT_FOR_FUNDING_CONFIRMED(commitments, None, Right(fundingSigned))
-      }
+              val commitments = Commitments(localParams, remoteParams,
+                LocalCommit(0, localSpec, PublishableTxs(signedLocalCommitTx, Nil), null), RemoteCommit(0, remoteSpec, remoteCommitTx.tx.txid, remoteFirstPerCommitmentPoint),
+                LocalChanges(Nil, Nil, Nil), RemoteChanges(Nil, Nil, Nil),
+                localNextHtlcId = 0L, remoteNextHtlcId = 0L,
+                remoteNextCommitInfo = Right(null), // TODO: we will receive their next per-commitment point in the next message, so we temporarily put an empty byte array,
+                unackedMessages = Nil,
+                commitInput, ShaChain.init, channelId = channelId)
+              context.parent ! ChannelIdAssigned(self, temporaryChannelId, channelId) // we notify the peer asap so it knows how to route messages
+              context.system.eventStream.publish(ChannelIdAssigned(self, temporaryChannelId, channelId))
+              context.system.eventStream.publish(ChannelSignatureReceived(self, commitments))
+              goto(WAIT_FOR_FUNDING_CONFIRMED) using DATA_WAIT_FOR_FUNDING_CONFIRMED(commitments, None, Right(fundingSigned))
+          }
 
     case Event(CMD_CLOSE(_), _) => goto(CLOSED)
 

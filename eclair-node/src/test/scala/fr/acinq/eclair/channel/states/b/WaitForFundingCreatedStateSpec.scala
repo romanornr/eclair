@@ -8,7 +8,7 @@ import fr.acinq.eclair.channel._
 import fr.acinq.eclair.channel.states.StateTestsHelperMethods
 import fr.acinq.eclair.transactions.Transactions
 import fr.acinq.eclair.wire._
-import fr.acinq.eclair.{TestBitcoinClient, TestConstants, TestkitBaseClass}
+import fr.acinq.eclair.{TestBitcoinClient, TestConstants, TestkitBaseClass, toLongId}
 import org.junit.runner.RunWith
 import org.scalatest.Tag
 import org.scalatest.junit.JUnitRunner
@@ -79,10 +79,12 @@ class WaitForFundingCreatedStateSpec extends TestkitBaseClass with StateTestsHel
 
   test("recv FundingCreated (fee too low)", Tag("fee_too_low")) { case (bob, alice2bob, bob2alice, bob2blockchain) =>
     within(30 seconds) {
-      alice2bob.expectMsgType[FundingCreated]
+      val fundingCreated = alice2bob.expectMsgType[FundingCreated]
       alice2bob.forward(bob)
       val error = bob2alice.expectMsgType[Error]
-      assert(new String(error.data) === "local/remote feerates are too different: remoteFeeratePerKw=100 localFeeratePerKw=10000")
+      val channelId = toLongId(fundingCreated.fundingTxid, fundingCreated.fundingOutputIndex)
+      // we check that the error uses the new channel id
+      assert(error === Error(channelId, "local/remote feerates are too different: remoteFeeratePerKw=100 localFeeratePerKw=10000".getBytes("UTF-8")))
       awaitCond(bob.stateName == CLOSED)
     }
   }
