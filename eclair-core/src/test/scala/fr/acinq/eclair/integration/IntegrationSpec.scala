@@ -71,7 +71,7 @@ class IntegrationSpec extends TestKit(ActorSystem("test")) with FunSuiteLike wit
 
   override def afterAll(): Unit = {
     // gracefully stopping bitcoin will make it store its state cleanly to disk, which is good for later debugging
-    logger.info(s"stopping bitcoind")
+    logger.info(s"stopping viacoind")
     val sender = TestProbe()
     sender.send(bitcoincli, BitcoinReq("stop"))
     sender.expectMsgType[JValue]
@@ -86,9 +86,9 @@ class IntegrationSpec extends TestKit(ActorSystem("test")) with FunSuiteLike wit
     //    bitcoind = s"$PATH_BITCOINQT -datadir=$PATH_BITCOIND_DATADIR".run()
   }
 
-  test("wait bitcoind ready") {
+  test("wait viacoind ready") {
     val sender = TestProbe()
-    logger.info(s"waiting for bitcoind to initialize...")
+    logger.info(s"waiting for viacoind to initialize...")
     awaitCond({
       sender.send(bitcoincli, BitcoinReq("getinfo"))
       sender.receiveOne(5 second).isInstanceOf[JValue]

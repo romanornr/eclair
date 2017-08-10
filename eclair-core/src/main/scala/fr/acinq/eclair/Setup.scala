@@ -60,7 +60,7 @@ class Setup(datadir: File, overrideDefaults: Config = ConfigFactory.empty(), act
   } yield (chain, blockCount, progress, chainHash, bitcoinVersion)
   val (chain, blockCount, progress, chainHash, bitcoinVersion) = Try(Await.result(future, 10 seconds)).recover { case _ => throw BitcoinRPCConnectionException }.get
   logger.info(s"using chain=$chain chainHash=$chainHash")
-  assert(progress > 0.99, "bitcoind should be synchronized")
+  assert(progress > 0.99, "viacoind should be synchronized")
   chain match {
     case "test" | "regtest" => ()
     case _ => throw new RuntimeException("only regtest and testnet are supported for now")
