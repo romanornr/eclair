@@ -63,6 +63,7 @@ class Setup(datadir: File, overrideDefaults: Config = ConfigFactory.empty(), act
   assert(progress > 0.99, "viacoind should be synchronized")
   chain match {
     case "test" | "regtest" => ()
+    case "main" => ()
     case _ => throw new RuntimeException("only regtest and testnet are supported for now")
   }
   // we use it as final payment address, so that funds are moved to the bitcoind wallet upon channel termination
