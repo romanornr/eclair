@@ -29,11 +29,11 @@ Please see the latest [release note](https://github.com/ACINQ/eclair/releases) f
 
 :warning: **Those are valid for the most up-to-date, unreleased, version of eclair. Here are the [instructions for Eclair 0.2-alpha4](https://github.com/ACINQ/eclair/blob/v0.2-alpha4/README.md#installation)**.
 
-### Configuring Bitcoin Core
+### Configuring Viacoin Core
 
-Eclair needs a _synchronized_, _segwit-ready_, **_zeromq-enabled_**, _non-pruning_, _tx-indexing_ [Bitcoin Core](https://github.com/bitcoin/bitcoin) node. This means that on Windows you will need Bitcoin Core 0.14+.
+Eclair needs a _synchronized_, _segwit-ready_, **_zeromq-enabled_**, _non-pruning_, _tx-indexing_ [Viacoin Core](https://github.com/viacoin/viacoin) node. This means that on Windows you will need Viacoin Core 0.14+.
 
-Run bitcoind with the following minimal `bitcoin.conf`:
+Run viacoind with the following minimal `viacoin.conf`:
 ```
 regtest=1
 server=1
@@ -86,9 +86,9 @@ option                       | description               | default value
 -----------------------------|---------------------------|--------------
  eclair.server.port          | TCP port                  | 9735
  eclair.api.port             | HTTP port                 | 8080
- eclair.bitcoind.rpcuser     | Bitcoin Core RPC user     | foo
- eclair.bitcoind.rpcpassword | Bitcoin Core RPC password | bar
- eclair.bitcoind.zmq         | Bitcoin Core ZMQ address  | tcp://127.0.0.1:29000
+ eclair.viacoind.rpcuser     | Viacoin Core RPC user     | foo
+ eclair.viacoind.rpcpassword | Viacoin Core RPC password | bar
+ eclair.viacoind.zmq         | Viacoin Core ZMQ address  | tcp://127.0.0.1:29000
 
 &rarr; see [`reference.conf`](eclair-core/src/main/resources/reference.conf) for full reference.
 
