@@ -78,7 +78,7 @@ class FxApp extends Application with Logging {
           case TCPBindException(port) =>
             notifyPreloader(new ErrorNotification("Setup", s"Could not bind to port $port", null))
           case BitcoinRPCConnectionException =>
-            notifyPreloader(new ErrorNotification("Setup", "Could not connect to Bitcoin Core using JSON-RPC.", null))
+            notifyPreloader(new ErrorNotification("Setup", "Could not connect to Viacoin Core using JSON-RPC.", null))
             notifyPreloader(new AppNotification(InfoAppNotification, "Make sure that Viacoin Core is up and running and RPC parameters are correct."))
           case BitcoinZMQConnectionTimeoutException =>
             notifyPreloader(new ErrorNotification("Setup", "Could not connect to Viacoin Core using ZMQ.", null))
