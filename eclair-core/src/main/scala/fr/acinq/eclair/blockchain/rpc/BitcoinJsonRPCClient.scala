@@ -22,7 +22,7 @@ case class JsonRPCResponse(result: JValue, error: Option[Error], id: String)
 case class JsonRPCError(error: Error) extends IOException(s"${error.message} (code: ${error.code})")
 // @formatter:on
 
-class BitcoinJsonRPCClient(user: String, password: String, host: String = "127.0.0.1", port: Int = 5223, ssl: Boolean = false)(implicit system: ActorSystem) {
+class BitcoinJsonRPCClient(user: String, password: String, host: String = "127.0.0.1", port: Int = 5222, ssl: Boolean = false)(implicit system: ActorSystem) {
 
   val scheme = if (ssl) "https" else "http"
   val uri = Uri(s"$scheme://$host:$port")

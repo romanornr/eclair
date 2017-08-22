@@ -35,11 +35,12 @@ Eclair needs a _synchronized_, _segwit-ready_, **_zeromq-enabled_**, _non-prunin
 
 Run viacoind with the following minimal `viacoin.conf`:
 ```
-regtest=1
 server=1
 rpcuser=XXX
 rpcpassword=XXX
+rpcport=5222
 txindex=1
+rpcallowip=127.0.0.1
 zmqpubrawblock=tcp://127.0.0.1:29000
 zmqpubrawtx=tcp://127.0.0.1:29000
 ```
