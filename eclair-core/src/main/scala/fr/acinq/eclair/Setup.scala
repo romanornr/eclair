@@ -80,6 +80,8 @@ class Setup(datadir: File, overrideDefaults: Config = ConfigFactory.empty(), act
   val nodeParams = NodeParams.makeNodeParams(datadir, config, chainHash, finalScriptPubKey)
   logger.info(s"nodeid=${nodeParams.privateKey.publicKey.toBin} alias=${nodeParams.alias}")
 
+  DBCompatChecker.checkDBCompatibility(nodeParams)
+
   Globals.blockCount.set(blockCount)
 
   val defaultFeeratePerKw = config.getLong("default-feerate-perkw")
@@ -89,7 +91,6 @@ class Setup(datadir: File, overrideDefaults: Config = ConfigFactory.empty(), act
   }
   logger.info(s"initial feeratePerKw=$feeratePerKw")
   Globals.feeratePerKw.set(feeratePerKw)
-
 
   def bootstrap: Future[Kit] = {
     val zmqConnected = Promise[Boolean]()
